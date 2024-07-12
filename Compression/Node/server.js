@@ -1,15 +1,21 @@
-import express from "express";
-import { json } from "body-parser";
-import multer, { memoryStorage } from "multer"; 
+const express= require( "express");
+const body= require("body-parser");
+const multer = require("multer");
+const cors = require("cors");
 const app = express();
 const port = 5000;
 
+app.use(cors({
+  origin: '*',
+  methods: ['GET', 'POST', 'PUT', 'DELETE'],
+  allowedHeaders: ['Content-Type'],
+}));
 
-const storage = memoryStorage(); 
+const storage = "./PyScripts/input"; 
 const upload = multer({ storage: storage });
 
 
-app.use(json())
+app.use(body.json());
 
 app.post("/upload", upload.single("file"), (req, res, next) => {
   const file = req.file;

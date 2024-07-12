@@ -35,7 +35,6 @@ export default function InputFileUpload(props) {
     e.preventDefault();
     const file = ref.current.files[0];
 
-    // Check if a file is selected
     if (!file) {
       setErrorMessage('No file selected.');
       return;

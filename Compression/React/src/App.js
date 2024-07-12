@@ -1,7 +1,7 @@
-import ParticlesComponent from "./components/particles";
-import InputFileUpload from "./components/InputFileUpload";
+import ParticlesComponent from "./Components/particles";
+import InputFileUpload from "./Components/InputFileUpload";
 function App() {
-  // Test Commit
+ 
   return (
     <>
       <div className="App">
