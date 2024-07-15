@@ -2,7 +2,6 @@
     "name": "compress",
     "version": "0.1.0",
     "private": true,
-    "proxy": "https://upgraded-funicular-4j7p5xp5rwr4hpw4-5000.app.github.dev/:5000",
     "dependencies": {
         "@emotion/react": "^11.11.4",
         "@emotion/styled": "^11.11.5",

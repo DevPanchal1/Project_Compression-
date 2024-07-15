@@ -1,5 +1,5 @@
-import ParticlesComponent from "./Components/particles";
-import InputFileUpload from "./Components/InputFileUpload";
+import ParticlesComponent from "./particles"
+import InputFileUpload from "./InputFileUpload" 
 function App() {
  
   return (

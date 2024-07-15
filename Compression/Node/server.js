@@ -1,7 +1,9 @@
-const express= require( "express");
-const body= require("body-parser");
+const express = require("express");
+const bodyParser = require("body-parser");
 const multer = require("multer");
 const cors = require("cors");
+const path = require("path");
+const fs = require("fs");
 const app = express();
 const port = 5000;
 
@@ -11,11 +13,19 @@ app.use(cors({
   allowedHeaders: ['Content-Type'],
 }));
 
-const storage = "./PyScripts/input"; 
+
+const storage = multer.diskStorage({
+  destination: function (req, file, cb) {
+    cb(null, "./PyScripts/input");
+  },
+  filename: function (req, file, cb) {
+    cb(null, file.originalname);
+  }
+});
 const upload = multer({ storage: storage });
 
+app.use(bodyParser.json());
 
-app.use(body.json());
 
 app.post("/upload", upload.single("file"), (req, res, next) => {
   const file = req.file;
@@ -24,9 +34,26 @@ app.post("/upload", upload.single("file"), (req, res, next) => {
     error.httpStatusCode = 400;
     return next(error);
   }
-  res.json("Congo Dude!");
+  console.log("File uploaded:", file.originalname);
+  const filePath = path.join(__dirname, "PyScripts", "input", file.originalname);
+  fs.readFile(filePath, "utf8", (err, data) => {
+    if (err) {
+      console.error("Error reading file:", err);
+      return res.status(500).send("Error processing file");
+    }
+  
+    const processedData = data.toUpperCase(); 
+    
+    res.json({ result: processedData });
+    fs.unlink(filePath, (err) => {
+      if (err) {
+        console.error("Error deleting file:", err);
+      } else {
+        console.log("File deleted successfully");
+      }
+    });
+  });
 });
-
 
 app.listen(port, () => {
   console.log("Server listening on port", port);
