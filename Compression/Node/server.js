@@ -13,17 +13,13 @@ app.use(cors({
   allowedHeaders: ['Content-Type'],
 }));
 
-
-const storage = multer.diskStorage({
-  destination: function (req, file, cb) {
-    cb(null, "./PyScripts/input");
+const upload = multer({
+  dest: './PyScript/input',
+  filename: file.originalname,
+  limits: {
+      fileSize: 3000000 // 3mb 
   },
-  filename: function (req, file, cb) {
-    cb(null, file.originalname);
-  }
-});
-const upload = multer({ storage: storage });
-
+})
 app.use(bodyParser.json());
 
 
@@ -35,24 +31,7 @@ app.post("/upload", upload.single("file"), (req, res, next) => {
     return next(error);
   }
   console.log("File uploaded:", file.originalname);
-  const filePath = path.join(__dirname, "PyScripts", "input", file.originalname);
-  fs.readFile(filePath, "utf8", (err, data) => {
-    if (err) {
-      console.error("Error reading file:", err);
-      return res.status(500).send("Error processing file");
-    }
-  
-    const processedData = data.toUpperCase(); 
-    
-    res.json({ result: processedData });
-    fs.unlink(filePath, (err) => {
-      if (err) {
-        console.error("Error deleting file:", err);
-      } else {
-        console.log("File deleted successfully");
-      }
-    });
-  });
+  res.status(200).json({ message: "File uploaded" });
 });
 
 app.listen(port, () => {
