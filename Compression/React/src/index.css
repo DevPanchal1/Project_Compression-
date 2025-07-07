@@ -1,52 +1,73 @@
-*{
+* {
   margin: 0;
   padding: 0;
+  box-sizing: border-box;
 }
 
 body {
-  margin: 0;
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen',
-    'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue',
-    sans-serif;
-  -webkit-font-smoothing: antialiased;
-  -moz-osx-font-smoothing: grayscale;
+  font-family: 'Segoe UI', 'Roboto', sans-serif;
+  color: rgb(37, 32, 32);
+  background: #f5f7fa;
+  height: 100vh;
 }
 
-code {
-  font-family: source-code-pro, Menlo, Monaco, Consolas, 'Courier New',
-    monospace;
-}
-
-#particles canvas{
+#particles canvas {
   z-index: -1;
   height: 100%;
   width: 100%;
   position: absolute;
 }
 
-.App{
+.App {
   height: 100vh;
   width: 100vw;
   position: relative;
-}
-
-.center{
-  width: 100%;
-  height: 100%;
-  display:flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.upload{
+  padding: 20px;
   display: flex;
   flex-direction: column;
   align-items: center;
-  color:white;
-  gap: 10px;
+  justify-content: flex-start;
+  gap: 40px;
 }
 
-.flex{
+.header {
+  max-width: 700px;
+  text-align: center;
+  padding: 0.15rem 0;
+}
+
+.description {
+  font-size: 1.1rem;
+  color: #444;
+  line-height: 1.6;
+}
+
+.center {
+  width: 100%;
+  display: flex;
+  justify-content: center;
+  align-items: flex-start;
+}
+
+.upload-box {
+  padding: 30px;
+  background-color: white;
+  border-radius: 2%;
+  border: 1px solid #ddd;
+  min-width: 320px;
+  max-width: 480px;
+  width: 100%;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
+}
+
+.upload {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 5px;
+}
+
+.flex {
   display: flex;
   flex-direction: column;
   gap: 10px;
