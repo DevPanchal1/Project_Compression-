@@ -16,9 +16,6 @@ app.use(cors({
   allowedHeaders: ['Content-Type'],
 }));
 
-// bodyParser.json() is typically for JSON request bodies.
-// For file uploads with multer, req.body will contain non-file fields parsed by multer.
-// Keep if you have other JSON endpoints, otherwise it might not be strictly necessary for this app.
 app.use(bodyParser.json());
 
 // Serve static files from the React app's build directory
@@ -47,8 +44,70 @@ const upload = multer({
   limits: { fileSize: 3 * 1024 * 1024 }, // 3MB limit
 });
 
+/**
+ * Helper function to get file size.
+ * @param {string} filePath - Path to the file.
+ * @returns {Promise<number>} A promise that resolves with the file size in bytes.
+ */
+async function getFileSize(filePath) {
+  try {
+    const stats = await fs.promises.stat(filePath);
+    return stats.size;
+  } catch (error) {
+    // If file not found or other error, return 0 or re-throw if critical
+    console.error(`Error getting file size for ${filePath}:`, error);
+    return 0; 
+  }
+}
+
+/**
+ * Helper function to run the Python script.
+ * @param {string} command - 'compress' or 'decompress'
+ * @param {string} inputPath - Path to the input file for Python.
+ * @param {string} outputPath - Path for the output file from Python.
+ * @returns {Promise<void>} A promise that resolves if Python script succeeds, rejects otherwise.
+ */
+function runPythonScript(command, inputPath, outputPath) {
+  return new Promise((resolve, reject) => {
+    const pythonArgs = ["PyScript/main.py", command, inputPath, outputPath];
+    console.log(`Running Python: python ${pythonArgs.join(' ')}`);
+
+    const python = spawn("python", pythonArgs);
+
+    let stdoutData = '';
+    let stderrData = '';
+
+    python.stdout.on("data", (data) => {
+      stdoutData += data.toString();
+      // console.log(`Python stdout: ${data}`); // Uncomment for verbose Python stdout in logs
+    });
+
+    python.stderr.on("data", (data) => {
+      stderrData += data.toString();
+      console.error(`Python stderr: ${data}`);
+    });
+
+    python.on("close", (code) => {
+      if (code !== 0) {
+        console.error(`Python script exited with code ${code}`);
+        // Reject with a more informative error message
+        reject(new Error(`Python ${command}ion failed. Details: ${stderrData || stdoutData || 'Unknown Python error'}`));
+      } else {
+        console.log(`Python ${command}ion successful.`);
+        resolve();
+      }
+    });
+
+    python.on('error', (err) => {
+      console.error('Failed to start Python process:', err);
+      // Reject if the Python process itself couldn't be spawned (e.g., 'python' not found)
+      reject(new Error(`Failed to start Python process: ${err.message}. Is Python installed and in PATH?`));
+    });
+  });
+}
+
 // POST /upload → auto compress or decompress based on file extension
-app.post("/upload", upload.single("file"), (req, res) => {
+app.post("/upload", upload.single("file"), async (req, res) => { // Make the route handler async
   if (!req.file) {
     return res.status(400).json({ message: "No file uploaded." });
   }
@@ -62,11 +121,9 @@ app.post("/upload", upload.single("file"), (req, res) => {
   let outputPath;
 
   if (ext === ".txt") {
-    // Compress
     command = "compress";
     outputFilename = baseName + ".bin";
   } else if (ext === ".bin") {
-    // Decompress
     command = "decompress";
     outputFilename = baseName + "_decompressed.txt";
   } else {
@@ -84,72 +141,54 @@ app.post("/upload", upload.single("file"), (req, res) => {
   console.log(`Received file: ${req.file.originalname}`);
   console.log(`${command === "compress" ? "Compressing" : "Decompressing"} to: ${outputFilename}`);
 
-  // Run Python script
-  // Note: 'python' command must be available in the Render environment.
-  // Render's default environment usually includes Python.
-  const python = spawn("python", ["PyScript/main.py", command, inputPath, outputPath]);
+  try {
+    const originalFileSize = await getFileSize(inputPath); // Get original file size
 
-  let pythonStdout = '';
-  let pythonStderr = '';
+    // AWAIT the Python script to complete
+    await runPythonScript(command, inputPath, outputPath);
 
-  python.stdout.on("data", (data) => {
-    pythonStdout += data.toString();
-    console.log(`Python stdout: ${data}`);
-  });
-
-  python.stderr.on("data", (data) => {
-    pythonStderr += data.toString();
-    console.error(`Python stderr: ${data}`);
-  });
-
-  python.on("close", (code) => {
     // Clean up the input file after processing, regardless of success or failure
     fs.unlink(inputPath, (err) => {
         if (err) console.error(`Error deleting input file ${inputPath}:`, err);
     });
 
-    if (code !== 0) {
-      console.error(`Python script exited with code ${code}`);
-      return res.status(500).json({ 
-        message: `${command}ion failed.`,
-        details: pythonStderr || `Python process exited with code ${code}` // Provide stderr if available
-      });
+    // After Python script completes, check if the output file was actually created
+    await fs.promises.access(outputPath, fs.constants.F_OK);
+
+    const finalOutputFileSize = await getFileSize(outputPath); // Get final output file size
+
+    let compressionPercentage = null; // Default to null
+    if (command === "compress" && originalFileSize > 0) {
+      compressionPercentage = ((originalFileSize - finalOutputFileSize) / originalFileSize) * 100;
+      // Ensure percentage is not negative due to small file size variations or headers
+      if (compressionPercentage < 0) compressionPercentage = 0; 
     }
 
-    // Check if the output file was actually created by the Python script
-    fs.access(outputPath, fs.constants.F_OK, (err) => {
-      if (err) {
-        console.error(`Output file not found after Python script: ${outputPath}`, err);
-        return res.status(500).json({ 
-          message: `${command}ed file not found.`,
-          details: `Python output: ${pythonStderr || pythonStdout}` // Show any python output
-        });
-      }
+    // Construct the download URL using the deployed host
+    const downloadUrl = `${req.protocol}://${req.get('host')}/download/${outputFilename}`;
 
-      // Construct the download URL using the deployed host
-      // req.protocol + '://' + req.get('host') will give the full URL (e.g., https://your-service.onrender.com)
-      const downloadUrl = `${req.protocol}://${req.get('host')}/download/${outputFilename}`;
+    return res.status(200).json({
+      success: true,
+      command: command, // 'compress' or 'decompress'
+      filename: outputFilename,
+      downloadUrl: downloadUrl,
+      compressionPercentage: compressionPercentage !== null ? parseFloat(compressionPercentage.toFixed(2)) : null 
+    });
 
-      return res.status(200).json({
-        success: true,
-        command: command, // 'compress' or 'decompress'
-        filename: outputFilename,
-        downloadUrl: downloadUrl
+  } catch (error) {
+    console.error(`Processing failed: ${error.message}`);
+    // Attempt to clean up input file if an error occurred before unlink in .on('close')
+    // This is a fallback, as runPythonScript should handle unlink on close.
+    if (fs.existsSync(inputPath)) {
+      fs.unlink(inputPath, (err) => {
+          if (err) console.error(`Error deleting input file ${inputPath} after error in catch block:`, err);
       });
-    });
-  });
-
-  python.on('error', (err) => {
-    console.error('Failed to start Python process:', err);
-    // Clean up the input file if Python process failed to start
-    fs.unlink(inputPath, (unlinkErr) => {
-        if (unlinkErr) console.error(`Error deleting input file ${inputPath} after spawn error:`, unlinkErr);
-    });
+    }
     return res.status(500).json({
-      message: `Failed to start Python process. Is Python installed and in PATH?`,
-      details: err.message
+      message: `Operation failed: ${error.message}`,
+      details: error.message
     });
-  });
+  }
 });
 
 // For any other GET request, serve the React app's index.html
